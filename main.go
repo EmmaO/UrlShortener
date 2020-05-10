@@ -23,7 +23,7 @@ type ShortenedURL struct {
 	ExpirationUTC time.Time
 }
 
-var firestoreClient firestore.Client
+var firestoreClient *firestore.Client
 
 func main() {
 	configureFirebaseClient()
@@ -50,9 +50,6 @@ func configureFirebaseClient() {
 
 func redirectByHashKey(w http.ResponseWriter, r *http.Request) {
 	var hashKey = mux.Vars(r)["hashKey"]
-
-	app, _ := firebase.NewApp(context.Background(), nil, option.WithCredentialsFile(""))
-	firestoreClient, _ := app.Firestore(context.Background())
 
 	docRef := firestoreClient.Doc(fmt.Sprintf("shorturls/%v", hashKey))
 	doc, err := docRef.Get(r.Context())
