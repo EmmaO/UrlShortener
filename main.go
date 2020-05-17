@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -29,7 +29,11 @@ func main() {
 	configureFirebaseClient()
 
 	router := mux.NewRouter()
-	router.HandleFunc("/{hashKey}", redirectByHashKey).Methods("GET")
+	router.HandleFunc("/r/{hashKey}", redirectByHashKey).Methods("GET")
+	router.HandleFunc("/{hashKey}", createNewShortenedURL).Methods("POST")
+	router.HandleFunc("/", createNewShortenedURLRandomHash).Methods("POST")
+
+	http.ListenAndServe(":8080", router)
 }
 
 func configureFirebaseClient() {
@@ -41,18 +45,16 @@ func configureFirebaseClient() {
 		log.Fatalln(err)
 	}
 
-	firestoreClient, err := app.Firestore(ctx)
+	firestoreClient, err = app.Firestore(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer firestoreClient.Close()
 }
 
 func redirectByHashKey(w http.ResponseWriter, r *http.Request) {
-	var hashKey = mux.Vars(r)["hashKey"]
+	hashKey := mux.Vars(r)["hashKey"]
 
-	docRef := firestoreClient.Doc(fmt.Sprintf("shorturls/%v", hashKey))
-	doc, err := docRef.Get(r.Context())
+	doc, err := firestoreClient.Collection("shorturls").Doc(hashKey).Get(context.Background())
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			w.WriteHeader(http.StatusNotFound)
@@ -77,4 +79,97 @@ func redirectByHashKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, shortenedURL.FullURL, http.StatusMovedPermanently)
+}
+
+type CreateShortenedUrlRequest struct {
+	FullURL string
+}
+
+func createNewShortenedURLRandomHash(w http.ResponseWriter, r *http.Request) {
+
+	var requestBody CreateShortenedUrlRequest
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil || requestBody.FullURL == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	for i := 0; i < 100; i++ {
+		hashKey := generateRandomAlphaNumericString()
+
+		documentID, err := tryAddShortenedURL(hashKey, requestBody.FullURL)
+		if err == nil {
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(documentID))
+			return
+		} else if status.Code(err) != codes.AlreadyExists {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte("Unable to find unique hash after 100 attempts. Crazy."))
+}
+
+func generateRandomAlphaNumericString() string {
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+
+	returnValue := ""
+	for i := 0; i < 7; i++ {
+		returnValue += string(chars[rand.Intn(len(chars))])
+	}
+
+	return returnValue
+}
+
+func createNewShortenedURL(w http.ResponseWriter, r *http.Request) {
+	var hashKey = mux.Vars(r)["hashKey"]
+
+	var requestBody CreateShortenedUrlRequest
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil || requestBody.FullURL == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	documentId, err := tryAddShortenedURL(hashKey, requestBody.FullURL)
+	if err != nil {
+		switch status.Code(err) {
+		case codes.AlreadyExists:
+			w.WriteHeader(http.StatusConflict)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		json.NewEncoder(w).Encode(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(documentId))
+}
+
+func tryAddShortenedURL(hashKey string, fullURL string) (string, error) {
+	//expect not found error
+	ctx := context.Background()
+	_, err := firestoreClient.Collection("shorturls").Doc(hashKey).Get(ctx)
+	if err == nil {
+		//found existing record with that hashKey
+		return "", status.Error(codes.AlreadyExists, "key in use")
+	} else if status.Code(err) != codes.NotFound {
+		//something else went wrong
+		return "", err
+	}
+
+	_, err = firestoreClient.Collection("shorturls").Doc(hashKey).Set(ctx, ShortenedURL{
+		HashKey:       hashKey,
+		FullURL:       fullURL,
+		ExpirationUTC: time.Now().AddDate(0, 0, 7),
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return hashKey, nil
 }
