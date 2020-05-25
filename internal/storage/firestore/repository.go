@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/EmmaO/UrlShortener/pkg/adding"
-	"github.com/EmmaO/UrlShortener/pkg/getting"
+	"github.com/EmmaO/UrlShortener/internal/adding"
+	"github.com/EmmaO/UrlShortener/internal/getting"
 
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"

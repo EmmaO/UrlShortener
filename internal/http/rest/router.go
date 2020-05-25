@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"encoding/json"
 
-	"github.com/EmmaO/UrlShortener/pkg/getting"
-	"github.com/EmmaO/UrlShortener/pkg/adding"
+	"github.com/EmmaO/UrlShortener/internal/getting"
+	"github.com/EmmaO/UrlShortener/internal/adding"
 
 	"github.com/gorilla/mux"
 )

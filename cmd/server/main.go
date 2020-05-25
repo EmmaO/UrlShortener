@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/EmmaO/UrlShortener/pkg/storage/firestore"
-	"github.com/EmmaO/UrlShortener/pkg/getting"
+	"github.com/EmmaO/UrlShortener/internal/storage/firestore"
+	"github.com/EmmaO/UrlShortener/internal/getting"
 	"log"
 	"net/http"
-	"github.com/EmmaO/UrlShortener/pkg/http/rest"
-	"github.com/EmmaO/UrlShortener/pkg/adding"
+	"github.com/EmmaO/UrlShortener/internal/http/rest"
+	"github.com/EmmaO/UrlShortener/internal/adding"
 )
 
 func main() {

@@ -1,7 +1,7 @@
 package adding
 
 import (
-	"github.com/EmmaO/UrlShortener/pkg/stringextensions"
+	"github.com/EmmaO/UrlShortener/internal/stringextensions"
 	"time"
 )
 
